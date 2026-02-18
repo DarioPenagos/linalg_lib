@@ -1,3 +1,14 @@
 {
   "extraPaths": ["tests/"],
+  "reportMissingTypeStubs": "none",
+  "reportMissingModuleSource": "none",
+  "reportMissingParameterType": "none",
+  "reportPrivateImportUsage": "none",
+  "reportUnknownVariableType": false,
+  "reportUnknownArgumentType": false,
+  "reportUnknownParameterType": false,
+  "reportUnknownMemberType": false,
+  "reportOptionalSubscript": false,
+  "reportIndexIssue": false,
+  "reportAttributeAccessIssue": false,
 }

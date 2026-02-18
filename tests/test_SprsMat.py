@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 import scipy.sparse as sp
-from pytest import approx
 from linalg_lib import SprsMat
+from pytest import approx
 
 # ==========================================
 # 1. Structural Edge Cases
@@ -40,15 +40,6 @@ def test_boundary_access():
     Test the EXACT corners of the matrix.
     This catches 'off-by-one' errors in your bounds checking or row_ptr logic.
     """
-    rows, cols = 10, 10
-    mat = SprsMat.zeros(rows, cols)
-
-    # We manually inject values into the corners for testing
-    # Note: Since your current API constructs from vectors, we'll build a custom one
-    # Matrix with points at (0,0), (0,9), (9,0), (9,9)
-    row_ptr = [0, 2, 2, 2, 2, 2, 2, 2, 2, 3, 4]  # Skip middle rows
-    col_indx = [0, 9, 0, 9]  # Row 0 has (0,9), Row 9 has (0,9)
-    # Wait, the logic above is tricky to write manually. Let's use scipy to help generate inputs.
 
     coo = sp.coo_matrix(([1, 2, 3, 4], ([0, 0, 9, 9], [0, 9, 0, 9])), shape=(10, 10))
     csr = coo.tocsr()
