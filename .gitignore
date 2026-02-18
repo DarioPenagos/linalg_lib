@@ -1,0 +1,7 @@
+/target
+/result
+**/*.so
+**/*.pyc
+**/__pycache__
+.venv
+.direnv
