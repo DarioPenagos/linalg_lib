@@ -40,10 +40,6 @@ impl SprsMat {
         self.vals.clone()
     }
 
-    // fn shape(&self) -> (usize, usize) {
-    //     self.shape
-    // }
-
     fn __getitem__(&self, idx: [i32; 2]) -> PyResult<f64> {
         let [m, n] = idx;
         let m =
@@ -68,6 +64,7 @@ impl SprsMat {
         )
     }
 
+    // Todo
     fn __setitem__(&mut self, idx: [i32; 2], value: f64) -> PyResult<()> {
         let [m, n] = idx;
         let m =
@@ -101,5 +98,30 @@ impl SprsMat {
         };
 
         Ok(())
+    }
+
+    fn __repr__(&self) -> String {
+        let mut mat_vec = Vec::new();
+        for i in 0..self.shape.0 {
+            mat_vec.push(String::new());
+            let mut col_indx = 0;
+            for j in 0..self.shape.1 {
+                if self.col_indx[self.row_ptr[i]..self.row_ptr[i + 1]].get(col_indx) == Some(&j) {
+                    mat_vec
+                        .last_mut()
+                        .unwrap()
+                        .push_str(&self.vals[self.row_ptr[i] + col_indx].to_string());
+                    col_indx += 1;
+                } else {
+                    mat_vec.last_mut().unwrap().push_str("0");
+                }
+
+                if j < self.shape.1 {
+                    mat_vec.last_mut().unwrap().push(' ');
+                }
+            }
+        }
+
+        mat_vec.join("\n")
     }
 }
