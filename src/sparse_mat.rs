@@ -6,6 +6,7 @@ pub struct SprsMat {
     pub row_ptr: Vec<usize>,
     pub col_indx: Vec<usize>,
     vals: Vec<f64>,
+    #[pyo3(get)]
     pub shape: (usize, usize),
 }
 
@@ -35,13 +36,13 @@ impl SprsMat {
         }
     }
 
-    pub fn shape(&self) -> (usize, usize) {
-        self.shape
-    }
-
     pub fn vals(&self) -> Vec<f64> {
         self.vals.clone()
     }
+
+    // fn shape(&self) -> (usize, usize) {
+    //     self.shape
+    // }
 
     fn __getitem__(&self, idx: [i32; 2]) -> PyResult<f64> {
         let [m, n] = idx;
@@ -55,7 +56,7 @@ impl SprsMat {
                 "Index {:?} out of bounds for  matrix of shape {:?}",
                 idx, self.shape
             )));
-        }
+        };
         Ok(
             match self.col_indx[self.row_ptr[m]..self.row_ptr[m + 1]]
                 .iter()
@@ -65,5 +66,40 @@ impl SprsMat {
                 None => 0.0,
             },
         )
+    }
+
+    fn __setitem__(&mut self, idx: [i32; 2], value: f64) -> PyResult<()> {
+        let [m, n] = idx;
+        let m =
+            usize::try_from(m).map_err(|_| PyIndexError::new_err("index m cannot be negative"))?;
+        let n =
+            usize::try_from(n).map_err(|_| PyIndexError::new_err("index n cannot be negative"))?;
+
+        if self.shape.0 <= m || self.shape.1 <= n {
+            return Err(PyIndexError::new_err(format!(
+                "Index {:?} out of bounds for  matrix of shape {:?}",
+                idx, self.shape
+            )));
+        };
+
+        match self.col_indx[self.row_ptr[m]..self.row_ptr[m + 1]]
+            .iter()
+            .rposition(|x| x <= &n)
+        {
+            Some(rel_indx) => {
+                if self.col_indx[self.row_ptr[m] + rel_indx] == n {
+                    self.vals[self.row_ptr[m] + rel_indx] = value;
+                } else {
+                    self.vals.insert(self.row_ptr[m] + rel_indx, value);
+                    self.row_ptr.insert(self.row_ptr[m] + rel_indx, n);
+                    self.col_indx.iter_mut().for_each(|x| *x += 1);
+                }
+            }
+            None => {
+                todo!()
+            }
+        };
+
+        Ok(())
     }
 }

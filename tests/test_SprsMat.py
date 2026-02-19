@@ -16,21 +16,21 @@ def test_weird_shapes():
     """
     # 0x0 Matrix
     mat = SprsMat.zeros(0, 0)
-    assert mat.shape() == (0, 0)
+    assert mat.shape == (0, 0)
     assert mat.vals() == []
     with pytest.raises(IndexError):
         _ = mat[(0, 0)]
 
     # 5x0 Matrix (5 rows, 0 columns) -> Should have row_ptr=[0,0,0,0,0,0]
     mat = SprsMat.zeros(5, 0)
-    assert mat.shape() == (5, 0)
+    assert mat.shape == (5, 0)
     assert len(mat.vals()) == 0
     with pytest.raises(IndexError):
         _ = mat[(0, 0)]
 
     # 0x5 Matrix (0 rows, 5 columns) -> Should have row_ptr=[0]
     mat = SprsMat.zeros(0, 5)
-    assert mat.shape() == (0, 5)
+    assert mat.shape == (0, 5)
     with pytest.raises(IndexError):
         _ = mat[(0, 0)]
 
@@ -143,7 +143,7 @@ def test_fuzz_compare_scipy(iteration):
     )
 
     # 4. Verify Metadata
-    assert rust_mat.shape() == sp_mat.shape
+    assert rust_mat.shape == sp_mat.shape
     assert len(rust_mat.vals()) == sp_mat.nnz
 
     # 5. Verify Random Access (The Stress Test)
@@ -180,3 +180,95 @@ def test_full_matrix_access():
     for r in range(3):
         for c in range(3):
             assert mat[(r, c)] == dense[r, c]
+
+
+def test_setitem_existing_nonzero():
+    """Test updating a value that is already in the CSR structure."""
+    # Matrix: [[10.0, 0.0]]
+    mat = SprsMat([0, 1], [0], [10.0], (1, 2))
+    mat[0, 0] = 50.0
+
+    assert mat[0, 0] == 50.0
+    assert len(mat.vals()) == 1  # Should NOT have added a new element
+
+
+def test_setitem_new_nonzero():
+    """Test 'injecting' a value into a zero slot (requires shift)."""
+    # Matrix: [[10.0, 0.0]] -> [[10.0, 20.0]]
+    mat = SprsMat([0, 1], [0], [10.0], (1, 2))
+    mat[0, 1] = 20.0
+
+    assert mat[0, 1] == 20.0
+    assert len(mat.vals()) == 2
+    assert mat.vals() == [10.0, 20.0]
+
+
+def test_setitem_first_and_last_rows():
+    """Verify row_ptr updates correctly for the boundaries."""
+    # 3x3 Empty
+    mat = SprsMat.zeros(3, 3)
+
+    mat[0, 0] = 1.0
+    mat[2, 2] = 9.0
+
+    assert mat[0, 0] == 1.0
+    assert mat[2, 2] == 9.0
+    # row_ptr should be [0, 1, 1, 2]
+    # (Row 0 has one, Row 1 is empty, Row 2 has one)
+    assert len(mat.vals()) == 2
+
+
+# ==========================================
+# 2. Randomized Fuzzing with Scipy
+# ==========================================
+
+
+@pytest.mark.parametrize("seed", range(5))
+def test_fuzz_assignments(seed):
+    """
+    Randomized Stress Test:
+    1. Create empty matrix.
+    2. Perform 200 random assignments (zeros and non-zeros).
+    3. Compare against Scipy LIL matrix at every step.
+    """
+    np.random.seed(seed)
+    rows, cols = 20, 20
+
+    # Scipy LIL is the industry standard for 'building' sparse matrices via assignment
+    scipy_mat = sp.lil_matrix((rows, cols), dtype=np.float64)
+    rust_mat = SprsMat.zeros(rows, cols)
+
+    # Perform a mix of insertions and updates
+    for _ in range(200):
+        r = np.random.randint(0, rows)
+        c = np.random.randint(0, cols)
+        val = np.random.choice([0.0, np.random.random() * 100])
+
+        # Apply to both
+        scipy_mat[r, c] = val
+        rust_mat[r, c] = val
+
+        # Immediate check for consistency
+        assert rust_mat[r, c] == scipy_mat[r, c]
+
+    # Final state check
+    # Convert Scipy to CSR for a fair comparison of internal buffers
+    scipy_csr = scipy_mat.tocsr()
+    assert rust_mat.vals() == pytest.approx(scipy_csr.data.tolist())
+    assert len(rust_mat.vals()) == scipy_csr.nnz
+
+
+# ==========================================
+# 3. Error Handling
+# ==========================================
+
+
+def test_setitem_bounds_checking():
+    """Ensure invalid indices raise IndexError and don't crash Rust."""
+    mat = SprsMat.zeros(2, 2)
+
+    with pytest.raises(IndexError):
+        mat[5, 0] = 1.0
+
+    with pytest.raises(IndexError):
+        mat[0, -1] = 1.0
